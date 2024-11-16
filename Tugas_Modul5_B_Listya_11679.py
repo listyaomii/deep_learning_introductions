@@ -1,18 +1,18 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
+import pickle
 from PIL import Image
 import os
 
 # Definisikan jalur model
-model_path = 'best_model_tf.h5'
+model_directory = r'D:/coolyeah/semester5/ml/Introduction to Deep Learning (Praktek)/Tugas5_B_11679'
+model_path = os.path.join(model_directory, 'best_model.pkl')
 
-# Muat model
+# Load the model
 if os.path.exists(model_path):
     try:
-        # Mengurangi verbosity dari TensorFlow
-        tf.get_logger().setLevel('ERROR')
-        model = tf.keras.models.load_model(model_path, compile=False)
+        with open(model_path, 'rb') as model_file:
+            model = pickle.load(model_file)
 
         # Nama kelas untuk Fashion MNIST
         class_names = [
@@ -23,38 +23,47 @@ if os.path.exists(model_path):
         # Fungsi untuk memproses gambar
         def preprocess_image(image):
             image = image.resize((28, 28))  # Ubah ukuran menjadi 28x28 piksel
-            image = image.convert('L')  # Ubah menjadi grayscale
+            image = image.convert('L')
             image_array = np.array(image) / 255.0  # Normalisasi
-            image_array = image_array.reshape(1, 28, 28, 1)  # Ubah bentuk menjadi 4D array
+            image_array = image_array.reshape(1, -1)  # Flatten ke bentuk 1D array
             return image_array
 
         # UI Streamlit
         st.title("Fashion MNIST Image Classifier")
-        st.write("Unggah gambar item fashion (misalnya sepatu, tas, baju), dan model akan memprediksi kelasnya.")
+        st.write("Unggah beberapa gambar item fashion (misalnya sepatu, tas, baju), dan model akan memprediksi kelas masing-masing.")
 
-        # File uploader untuk input gambar
-        uploaded_file = st.file_uploader("Pilih gambar ...", type=["jpg", "jpeg", "png"])
+        # File uploader untuk input gambar (multiple files)
+        uploaded_files = st.file_uploader("Pilih gambar ... ", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-        # Tampilkan gambar yang diunggah dan tombol "Predict"
-        if uploaded_file is not None:
-            # Tampilkan gambar yang diunggah
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Gambar yang Diunggah", use_column_width=True)
+        # Sidebar dengan tombol "Predict" dan hasil prediksi
+        with st.sidebar:
+            st.write("## Navigator")
+            predict_button = st.button("Predict")  # Tombol di sidebar
 
-            # Tombol "Predict"
-            if st.button("Predict"):
-                # Proses gambar dan prediksi
+        # Tampilkan hasil prediksi di bawah tombol "Predict"
+        if uploaded_files and predict_button:
+            st.write("### Hasil Prediksi")
+
+            for uploaded_file in uploaded_files:
+                # Buka dan proses setiap gambar
+                image = Image.open(uploaded_file)
                 processed_image = preprocess_image(image)
-                predictions = model.predict(processed_image)[0]
-
-                # Mendapatkan kelas dan confidence dengan softmax
+                predictions = model.predict_proba(processed_image)
                 predicted_class = np.argmax(predictions)
-                confidence = predictions[predicted_class] * 100  # Pastikan confidence dalam persentase
+                confidence = np.max(predictions) * 100
 
-                # Tampilkan hasil prediksi
-                st.write("### Hasil Prediksi")
+                # Tampilkan nama file dan hasil prediksi
+                st.write(f"**Nama File:** {uploaded_file.name}")
                 st.write(f"Kelas Prediksi: **{class_names[predicted_class]}**")
                 st.write(f"Confidence: **{confidence:.2f}%**")
+                st.write("---")  # Garis pemisah antara hasil prediksi
+
+        # Tampilkan gambar yang diunggah di halaman utama
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                image = Image.open(uploaded_file)
+                st.image(image, caption=f"Gambar: {uploaded_file.name}", use_column_width=True)
+
     except Exception as e:
         st.error(f"Error: {str(e)}")
 else:
